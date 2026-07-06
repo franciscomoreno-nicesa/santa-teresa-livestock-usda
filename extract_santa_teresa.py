@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 # CONFIGURACION
 # =========================
 
-REPORT_LIMIT = 240
+REPORT_LIMIT = 100
 
 PUBLICATION_BASE_URL = (
     "https://esmis.nal.usda.gov/publication/"
@@ -89,7 +89,7 @@ def find_pdf_url_on_page(page_url):
     return None
 
 
-def discover_last_reports(limit=10, max_days_back=900):
+def discover_last_reports(limit=100, max_days_back=2100):
     """
     Busca hacia atras desde hoy hasta encontrar los ultimos reportes disponibles.
     No descarga uno por uno manualmente; el codigo revisa fechas y encuentra los PDFs.
