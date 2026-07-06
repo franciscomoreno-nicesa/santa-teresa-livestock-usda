@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 # CONFIGURACION
 # =========================
 
-REPORT_LIMIT = 10
+REPORT_LIMIT = 60
 
 PUBLICATION_BASE_URL = (
     "https://esmis.nal.usda.gov/publication/"
