@@ -13,7 +13,12 @@ from bs4 import BeautifulSoup
 # CONFIGURACION
 # =========================
 
-REPORT_LIMIT = 100
+# Aproximadamente 500 reportes para intentar cubrir desde 2018 hasta hoy
+REPORT_LIMIT = 500
+
+# Dias hacia atras para buscar publicaciones.
+# 3500 dias cubre aprox. 9.5 años.
+MAX_DAYS_BACK = 3500
 
 PUBLICATION_BASE_URL = (
     "https://esmis.nal.usda.gov/publication/"
@@ -89,13 +94,14 @@ def find_pdf_url_on_page(page_url):
     return None
 
 
-def discover_last_reports(limit=100, max_days_back=2100):
+def discover_last_reports(limit=REPORT_LIMIT, max_days_back=MAX_DAYS_BACK):
     """
     Busca hacia atras desde hoy hasta encontrar los ultimos reportes disponibles.
-    No descarga uno por uno manualmente; el codigo revisa fechas y encuentra los PDFs.
 
     limit = cuantos reportes quieres descargar.
     max_days_back = cuantos dias hacia atras revisar como maximo.
+
+    No descarga manualmente uno por uno; el codigo revisa las fechas y encuentra los PDFs.
     """
     found = []
     seen_pdf_urls = set()
@@ -127,6 +133,7 @@ def discover_last_reports(limit=100, max_days_back=2100):
         if len(found) >= limit:
             break
 
+    print(f"Total de reportes encontrados: {len(found)}")
     return found
 
 
@@ -180,6 +187,7 @@ def find_report_date(text, fallback_date=None):
     Fri Apr 4, 2025
     Tue Jul 15, 2025
     April 4, 2025
+    Livestock Weighted Average Report for 04/04/2025
     """
     patterns = [
         r"([A-Z][a-z]{2}\s+[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4})",
@@ -283,8 +291,8 @@ def parse_price_line(line):
     if not clean:
         return None
 
-    # Evita encabezados y textos generales
     lower = clean.lower()
+
     skip_words = [
         "head wt range",
         "please note",
@@ -302,6 +310,12 @@ def parse_price_line(line):
         "bulk of supply",
         "next sale",
         "auction",
+        "report",
+        "receipts",
+        "notice",
+        "state:",
+        "market:",
+        "cattle",
     ]
 
     if any(word in lower for word in skip_words):
@@ -332,13 +346,13 @@ def parse_price_line(line):
     except ValueError:
         return None
 
-    wt_range = match.group("wt_range").replace(" ", "")
+    weight_range = match.group("wt_range").replace(" ", "")
     price_range = match.group("price_range").replace(" ", "")
     notes = match.group("notes")
 
     return {
         "head_count": head_count,
-        "weight_range": wt_range,
+        "weight_range": weight_range,
         "avg_weight": avg_weight,
         "weight_bucket": get_weight_bucket(avg_weight),
         "price_range": price_range,
@@ -459,8 +473,13 @@ def save_rows(rows):
 def main():
     ensure_dirs()
 
-    print(f"Buscando los ultimos {REPORT_LIMIT} reportes de Santa Teresa...")
-    reports = discover_last_reports(limit=REPORT_LIMIT)
+    print(f"Buscando hasta {REPORT_LIMIT} reportes de Santa Teresa...")
+    print(f"Maximo de dias hacia atras: {MAX_DAYS_BACK}")
+
+    reports = discover_last_reports(
+        limit=REPORT_LIMIT,
+        max_days_back=MAX_DAYS_BACK,
+    )
 
     if not reports:
         print("No se encontraron reportes.")
@@ -473,12 +492,16 @@ def main():
         print(f"Procesando reporte: {report['publication_date']}")
         print(report["pdf_url"])
 
-        pdf_path = download_pdf(report)
-        text = extract_text_from_pdf(pdf_path)
-        rows = parse_report(text, pdf_path, report)
+        try:
+            pdf_path = download_pdf(report)
+            text = extract_text_from_pdf(pdf_path)
+            rows = parse_report(text, pdf_path, report)
 
-        print(f"Filas extraidas: {len(rows)}")
-        all_rows.extend(rows)
+            print(f"Filas extraidas: {len(rows)}")
+            all_rows.extend(rows)
+
+        except Exception as e:
+            print(f"Error procesando {report['publication_date']}: {e}")
 
     save_rows(all_rows)
 
