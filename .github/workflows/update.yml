@@ -1,0 +1,38 @@
+name: Update Santa Teresa Livestock Data
+
+on:
+  schedule:
+    # 9:00 AM Sonora / Hermosillo = 16:00 UTC
+    # Martes y viernes
+    - cron: "0 16 * * 2,5"
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run extractor
+        run: python extract_santa_teresa.py
+
+      - name: Commit updated files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/ pdfs/
+          git commit -m "Update Santa Teresa livestock data" || echo "No changes to commit"
+          git push
